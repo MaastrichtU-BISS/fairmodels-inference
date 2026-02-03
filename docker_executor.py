@@ -10,7 +10,8 @@ import json
 import logging
 import requests
 import time
-from typing import Dict, Any, Optional
+import socket
+from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,10 @@ class DockerExecutor:
             # Test connection
             self.client.ping()
             logger.info("Docker client initialized successfully")
+            
+            # Detect current container's network(s)
+            self.networks = self._detect_current_networks()
+            logger.info(f"Detected networks: {self.networks}")
         except docker.errors.DockerException as e:
             logger.error(f"Failed to initialize Docker client: {str(e)}")
             logger.error("Please ensure Docker is installed and running")
@@ -36,6 +41,32 @@ class DockerExecutor:
         except Exception as e:
             logger.error(f"Unexpected error initializing Docker client: {str(e)}")
             raise
+    
+    def _detect_current_networks(self) -> List[str]:
+        """
+        Detect which Docker networks the current container is connected to.
+        Returns a list of network names or IDs.
+        """
+        try:
+            # Get current hostname (container ID when running in a container)
+            hostname = socket.gethostname()
+            logger.info(f"Current hostname: {hostname}")
+            
+            # Try to find this container
+            try:
+                container = self.client.containers.get(hostname)
+                networks = list(container.attrs['NetworkSettings']['Networks'].keys())
+                logger.info(f"Found current container {hostname} in networks: {networks}")
+                return networks
+            except docker.errors.NotFound:
+                logger.info("Not running inside a container, or container not found")
+                return []
+            except Exception as e:
+                logger.warning(f"Could not detect container networks: {str(e)}")
+                return []
+        except Exception as e:
+            logger.warning(f"Error detecting networks: {str(e)}")
+            return []
     
     def run_inference(self, docker_image: str, input_data: Dict[str, Any]) -> Any:
         """
@@ -60,10 +91,10 @@ class DockerExecutor:
             container = self._start_container(docker_image)
             
             # Wait for the server to be ready
-            container_port = self._wait_for_server(container)
+            base_url = self._wait_for_server(container)
             
             # Make HTTP request to the model
-            result = self._make_inference_request(container_port, input_data)
+            result = self._make_inference_request(base_url, input_data)
             
             return result
             
@@ -120,11 +151,19 @@ class DockerExecutor:
         try:
             logger.info(f"Starting container with image: {image_name}")
             
+            # Determine network configuration
+            network_config = None
+            if self.networks:
+                # Use the first detected network
+                network_config = self.networks[0]
+                logger.info(f"Connecting model container to network: {network_config}")
+            
             # Start container in detached mode with port mapping
             container = self.client.containers.run(
                 image_name,
                 detach=True,
                 ports={'8000/tcp': None},  # Map to random host port
+                network=network_config,  # Connect to same network
                 remove=False,  # We'll remove it manually
                 mem_limit='1g',
                 cpu_period=100000,
@@ -132,13 +171,24 @@ class DockerExecutor:
             )
             
             logger.info(f"Container started with ID: {container.id[:12]}")
+            
+            # Connect to additional networks if present
+            if len(self.networks) > 1:
+                for network in self.networks[1:]:
+                    try:
+                        network_obj = self.client.networks.get(network)
+                        network_obj.connect(container)
+                        logger.info(f"Connected container to additional network: {network}")
+                    except Exception as e:
+                        logger.warning(f"Could not connect to network {network}: {str(e)}")
+            
             return container
             
         except Exception as e:
             logger.error(f"Failed to start container: {str(e)}")
             raise
     
-    def _wait_for_server(self, container, timeout: int = 60) -> int:
+    def _wait_for_server(self, container, timeout: int = 60) -> str:
         """
         Wait for the server inside the container to be ready.
         
@@ -147,17 +197,34 @@ class DockerExecutor:
             timeout: Maximum time to wait in seconds
             
         Returns:
-            The host port number where the server is accessible
+            The base URL where the server is accessible (either container IP or localhost:port)
         """
-        # Reload container to get port mapping
+        # Reload container to get network information
         container.reload()
-        port_mapping = container.ports.get('8000/tcp')
         
-        if not port_mapping:
-            raise Exception("Container did not expose port 8000")
-        
-        host_port = int(port_mapping[0]['HostPort'])
-        logger.info(f"Container exposed on host port: {host_port}")
+        # Determine the base URL based on whether we're running in a container
+        base_url = None
+        if self.networks:
+            # We're running in a container - use container's internal network address
+            network_name = self.networks[0]
+            network_settings = container.attrs['NetworkSettings']['Networks'].get(network_name)
+            if network_settings and network_settings.get('IPAddress'):
+                container_ip = network_settings['IPAddress']
+                base_url = f"http://{container_ip}:8000"
+                logger.info(f"Using container internal address: {base_url}")
+            else:
+                # Fallback: use container name or ID
+                container_name = container.name
+                base_url = f"http://{container_name}:8000"
+                logger.info(f"Using container name: {base_url}")
+        else:
+            # Running locally - use localhost with mapped port
+            port_mapping = container.ports.get('8000/tcp')
+            if not port_mapping:
+                raise Exception("Container did not expose port 8000")
+            host_port = int(port_mapping[0]['HostPort'])
+            base_url = f"http://localhost:{host_port}"
+            logger.info(f"Using localhost with mapped port: {base_url}")
         
         # Wait for server to be ready
         start_time = time.time()
@@ -169,13 +236,13 @@ class DockerExecutor:
                 for endpoint in ['/health', '/docs', '/']:
                     try:
                         response = requests.get(
-                            f"http://localhost:{host_port}{endpoint}", 
+                            f"{base_url}{endpoint}", 
                             timeout=2
                         )
                         # Any response (even 404) means server is running
                         if response.status_code in [200, 404, 405]:
                             logger.info(f"Server is ready (checked {endpoint})")
-                            return host_port
+                            return base_url
                     except requests.exceptions.RequestException as e:
                         last_error = str(e)
                         continue
@@ -197,19 +264,18 @@ class DockerExecutor:
             f"Last error: {last_error}\nContainer logs:\n{logs}"
         )
     
-    def _make_inference_request(self, port: int, input_data: Dict[str, Any]) -> Any:
+    def _make_inference_request(self, base_url: str, input_data: Dict[str, Any]) -> Any:
         """
         Make HTTP request to the model server for inference.
         
         Args:
-            port: The host port where the server is running
+            base_url: The base URL where the server is running
             input_data: Dictionary containing input values
             
         Returns:
             The parsed inference result
         """
         try:
-            base_url = f"http://localhost:{port}"
             
             # Step 1: POST to /predict to start the prediction
             logger.info(f"Starting prediction request to {base_url}/predict")
