@@ -30,12 +30,12 @@ jobs:
       - name: Push base image
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker tag my_image ghcr.io/${{ steps.repo_name.outputs.lowercase }}/base-image:${{ steps.branch_name.outputs.lowercase }}
-          docker push ghcr.io/${{ steps.repo_name.outputs.lowercase }}/base-image:${{ steps.branch_name.outputs.lowercase }}
+          docker tag my_image ghcr.io/${{ steps.repo_name.outputs.lowercase }}:${{ steps.branch_name.outputs.lowercase }}
+          docker push ghcr.io/${{ steps.repo_name.outputs.lowercase }}:${{ steps.branch_name.outputs.lowercase }}
       
       # if branch is main, also push as latest
       - name: Push base image as latest
         if: github.ref == 'refs/heads/main'
         run: |
-          docker tag my_image ghcr.io/${{ steps.repo_name.outputs.lowercase }}/base-image:latest
-          docker push ghcr.io/${{ steps.repo_name.outputs.lowercase }}/base-image:latest
+          docker tag my_image ghcr.io/${{ steps.repo_name.outputs.lowercase }}:latest
+          docker push ghcr.io/${{ steps.repo_name.outputs.lowercase }}:latest
