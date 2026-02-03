@@ -5,15 +5,15 @@
 {% block content %}
 <div class="welcome-section">
     <h2>Welcome to the FAIRmodels.org Inference Engine</h2>
-    <p>Enter a model ID from FAIRmodels.org to perform inference.</p>
+    <p>Enter a model URL or ID from FAIRmodels.org to perform inference.</p>
     
     <form action="" method="get" id="model-id-form" class="model-id-form">
         <div class="form-group">
-            <label for="model_id">Model ID:</label>
+            <label for="model_id">Model URL or ID:</label>
             <input type="text" 
                    id="model_id" 
                    name="model_id" 
-                   placeholder="e.g., e46b07fd-fbd5-4466-9e5b-79dfa36d347d"
+                   placeholder="e.g., https://v3.fairmodels.org/instance/e46b07fd-fbd5-4466-9e5b-79dfa36d347d or just the UUID"
                    required>
         </div>
         <button type="submit">Load Model</button>
@@ -42,7 +42,15 @@
 <script>
 document.getElementById('model-id-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    const modelId = document.getElementById('model_id').value.trim();
+    let modelId = document.getElementById('model_id').value.trim();
+    
+    // Extract UUID from URL if a full URL was provided
+    if (modelId.includes('://')) {
+        // Extract the last part of the URL path (the UUID)
+        const urlParts = modelId.split('/');
+        modelId = urlParts[urlParts.length - 1] || urlParts[urlParts.length - 2];
+    }
+    
     if (modelId) {
         window.location.href = `/model/${modelId}`;
     }

@@ -22,6 +22,24 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def extract_model_id(model_id_or_url: str) -> str:
+    """
+    Extract model ID from either a URL or a plain UUID.
+    
+    Args:
+        model_id_or_url: Either a full URL or just a UUID
+        
+    Returns:
+        The extracted UUID
+    """
+    if '://' in model_id_or_url:
+        # It's a URL, extract the last non-empty path segment
+        parts = model_id_or_url.rstrip('/').split('/')
+        return parts[-1]
+    # It's already just an ID
+    return model_id_or_url
+
+
 @app.route('/')
 def index():
     """Landing page with option to enter model ID."""
@@ -40,9 +58,12 @@ def model_form(model_id):
     Display the inference form for a specific model.
     
     Args:
-        model_id: The unique identifier for the model from FAIRmodels.org
+        model_id: The unique identifier for the model from FAIRmodels.org (or full URL)
     """
     try:
+        # Extract UUID if a full URL was provided
+        model_id = extract_model_id(model_id)
+        
         metadata_handler = MetadataHandler()
         metadata = metadata_handler.fetch_metadata(model_id)
         
@@ -73,9 +94,12 @@ def perform_inference(model_id):
     Perform inference using the submitted form data.
     
     Args:
-        model_id: The unique identifier for the model
+        model_id: The unique identifier for the model (or full URL)
     """
     try:
+        # Extract UUID if a full URL was provided
+        model_id = extract_model_id(model_id)
+        
         # Get form data
         input_data = request.form.to_dict()
         
@@ -108,9 +132,12 @@ def api_inference(model_id):
     API endpoint for performing inference (returns JSON).
     
     Args:
-        model_id: The unique identifier for the model
+        model_id: The unique identifier for the model (or full URL)
     """
     try:
+        # Extract UUID if a full URL was provided
+        model_id = extract_model_id(model_id)
+        
         # Get JSON data
         input_data = request.get_json()
         
