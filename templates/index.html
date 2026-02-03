@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Home - FAIR4AI Inferencing Engine{% endblock %}
+
+{% block content %}
+<div class="welcome-section">
+    <h2>Welcome to the FAIR4AI Inferencing Engine</h2>
+    <p>Enter a model ID from FAIRmodels.org to perform inference.</p>
+    
+    <form action="" method="get" id="model-id-form" class="model-id-form">
+        <div class="form-group">
+            <label for="model_id">Model ID:</label>
+            <input type="text" 
+                   id="model_id" 
+                   name="model_id" 
+                   placeholder="e.g., e46b07fd-fbd5-4466-9e5b-79dfa36d347d"
+                   required>
+        </div>
+        <button type="submit">Load Model</button>
+    </form>
+    
+    <div class="example-section">
+        <h3>Example Models</h3>
+        <ul>
+            <li>
+                <a href="{{ url_for('model_form', model_id='e46b07fd-fbd5-4466-9e5b-79dfa36d347d') }}">
+                    e46b07fd-fbd5-4466-9e5b-79dfa36d347d
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<script>
+document.getElementById('model-id-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const modelId = document.getElementById('model_id').value.trim();
+    if (modelId) {
+        window.location.href = `/model/${modelId}`;
+    }
+});
+</script>
+{% endblock %}

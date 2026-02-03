@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Inference Result - FAIR4AI{% endblock %}
+
+{% block content %}
+<div class="result-section">
+    <h2>Inference Result</h2>
+    
+    <div class="result-card">
+        <h3>Input Data</h3>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Variable</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for key, value in input_data.items() %}
+                <tr>
+                    <td>{{ key }}</td>
+                    <td>{{ value }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="result-card result-output">
+        <h3>Prediction Result</h3>
+        <div class="result-value">
+            {% if result is mapping %}
+                <table class="data-table">
+                    {% for key, value in result.items() %}
+                    <tr>
+                        <td><strong>{{ key }}:</strong></td>
+                        <td>{{ value }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            {% else %}
+                <pre>{{ result }}</pre>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="form-actions">
+        <a href="{{ url_for('model_form', model_id=model_id) }}" class="btn-primary">Run Another Inference</a>
+        <a href="{{ url_for('index') }}" class="btn-secondary">Home</a>
+    </div>
+</div>
+{% endblock %}

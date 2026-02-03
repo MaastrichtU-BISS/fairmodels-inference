@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Error - FAIR4AI{% endblock %}
+
+{% block content %}
+<div class="error-section">
+    <h2>Error</h2>
+    <div class="error-message">
+        <p>{{ error }}</p>
+    </div>
+    
+    <div class="form-actions">
+        <a href="{{ url_for('index') }}" class="btn-primary">Go to Home</a>
+    </div>
+</div>
+{% endblock %}

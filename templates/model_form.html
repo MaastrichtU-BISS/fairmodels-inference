@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}{{ model_name }} - FAIR4AI Inferencing{% endblock %}
+
+{% block content %}
+<div class="model-form-section">
+    <h2>{{ model_name }}</h2>
+    <p class="model-id">Model ID: {{ model_id }}</p>
+    
+    {% if docker_image %}
+    <p class="docker-info">Docker Image: <code>{{ docker_image }}</code></p>
+    {% endif %}
+    
+    <form action="{{ url_for('perform_inference', model_id=model_id) }}" method="post" class="inference-form">
+        {% if variables %}
+            {% for variable in variables %}
+            <div class="form-group">
+                <label for="{{ variable.name }}">
+                    {{ variable.label }}
+                    {% if variable.required %}
+                    <span class="required">*</span>
+                    {% endif %}
+                </label>
+                
+                {% if variable.description %}
+                <p class="field-description">{{ variable.description }}</p>
+                {% endif %}
+                
+                {% if variable.type == 'categorical' %}
+                    <div class="radio-group">
+                        {% for option in variable.options %}
+                            {% if option is mapping %}
+                                <label class="radio-box">
+                                    <input type="radio" 
+                                           name="{{ variable.name }}" 
+                                           value="{{ option.value }}"
+                                           {% if variable.required %}required{% endif %}>
+                                    <span class="radio-label">{{ option.label }}</span>
+                                </label>
+                            {% else %}
+                                <label class="radio-box">
+                                    <input type="radio" 
+                                           name="{{ variable.name }}" 
+                                           value="{{ option }}"
+                                           {% if variable.required %}required{% endif %}>
+                                    <span class="radio-label">{{ option }}</span>
+                                </label>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                
+                {% elif variable.type == 'number' %}
+                    <div class="number-slider-group">
+                        <input type="number" 
+                               id="{{ variable.name }}" 
+                               name="{{ variable.name }}"
+                               step="any"
+                               {% if variable.min is not none %}min="{{ variable.min }}"{% endif %}
+                               {% if variable.max is not none %}max="{{ variable.max }}"{% endif %}
+                               {% if variable.max is not none %}value="{{ (variable.min if variable.min is not none else 0 + variable.max) / 2 }}"{% endif %}
+                               {% if variable.required %}required{% endif %}
+                               oninput="var slider = document.getElementById('{{ variable.name }}_slider'); if(slider) slider.value = this.value">
+                        {% if variable.max is not none %}
+                        <input type="range" 
+                               id="{{ variable.name }}_slider" 
+                               class="slider"
+                               min="{{ variable.min if variable.min is not none else 0 }}"
+                               max="{{ variable.max }}"
+                               step="0.1"
+                               value="{{ ((variable.min if variable.min is not none else 0) + variable.max) / 2 }}"
+                               oninput="document.getElementById('{{ variable.name }}').value = this.value">
+                        {% endif %}
+                    </div>
+                    {% if variable.min is not none or variable.max is not none %}
+                    <small class="range-info">
+                        {% if variable.min is not none and variable.max is not none %}
+                        Range: {{ variable.min }} to {{ variable.max }}
+                        {% elif variable.min is not none %}
+                        Minimum: {{ variable.min }}
+                        {% elif variable.max is not none %}
+                        Maximum: {{ variable.max }}
+                        {% endif %}
+                    </small>
+                    {% endif %}
+                
+                {% elif variable.type == 'integer' %}
+                    <div class="number-slider-group">
+                        <input type="number" 
+                               id="{{ variable.name }}" 
+                               name="{{ variable.name }}"
+                               step="1"
+                               {% if variable.min is not none %}min="{{ variable.min }}"{% endif %}
+                               {% if variable.max is not none %}max="{{ variable.max }}"{% endif %}
+                               {% if variable.max is not none %}value="{{ (((variable.min if variable.min is not none else 0) + variable.max) / 2) | int }}"{% endif %}
+                               {% if variable.required %}required{% endif %}
+                               oninput="var slider = document.getElementById('{{ variable.name }}_slider'); if(slider) slider.value = this.value">
+                        {% if variable.max is not none %}
+                        <input type="range" 
+                               id="{{ variable.name }}_slider" 
+                               class="slider"
+                               min="{{ variable.min if variable.min is not none else 0 }}"
+                               max="{{ variable.max }}"
+                               step="1"
+                               value="{{ (((variable.min if variable.min is not none else 0) + variable.max) / 2) | int }}"
+                               oninput="document.getElementById('{{ variable.name }}').value = this.value">
+                        {% endif %}
+                    </div>
+                    {% if variable.min is not none or variable.max is not none %}
+                    <small class="range-info">
+                        {% if variable.min is not none and variable.max is not none %}
+                        Range: {{ variable.min }} to {{ variable.max }}
+                        {% elif variable.min is not none %}
+                        Minimum: {{ variable.min }}
+                        {% elif variable.max is not none %}
+                        Maximum: {{ variable.max }}
+                        {% endif %}
+                    </small>
+                    {% endif %}
+                
+                {% elif variable.type == 'boolean' %}
+                    <select id="{{ variable.name }}" 
+                            name="{{ variable.name }}" 
+                            {% if variable.required %}required{% endif %}>
+                        <option value="">-- Select --</option>
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                
+                {% else %}
+                    <input type="text" 
+                           id="{{ variable.name }}" 
+                           name="{{ variable.name }}"
+                           {% if variable.required %}required{% endif %}>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="warning">No input variables found in model metadata.</p>
+        {% endif %}
+        
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Run Inference</button>
+            <a href="{{ url_for('index') }}" class="btn-secondary">Back</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
