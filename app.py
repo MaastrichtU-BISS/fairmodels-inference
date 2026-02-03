@@ -1,5 +1,5 @@
 """
-FAIR4AI Inferencing Engine - Main Flask Application
+FAIRmodels.org Inference Engine - Main Flask Application
 
 This application provides a web interface for performing inference with models
 from FAIRmodels.org. It dynamically generates input forms based on model metadata
