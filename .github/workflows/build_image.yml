@@ -1,0 +1,41 @@
+# Github Actions workflow to build the base image
+name: Build Image
+
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Build base image
+        run: docker build -t my_image ./
+      
+      - name: repo_name
+        id: repo_name
+        uses: ASzc/change-string-case-action@v6
+        with:
+          string: ${{ github.repository }}
+      
+      - name: branch_name
+        id: branch_name
+        uses: ASzc/change-string-case-action@v6
+        with:
+          string: ${{ github.ref_name }}
+
+      - name: Push base image
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker tag my_image ghcr.io/${{ steps.repo_name.outputs.lowercase }}/base-image:${{ steps.branch_name.outputs.lowercase }}
+          docker push ghcr.io/${{ steps.repo_name.outputs.lowercase }}/base-image:${{ steps.branch_name.outputs.lowercase }}
+      
+      # if branch is main, also push as latest
+      - name: Push base image as latest
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker tag my_image ghcr.io/${{ steps.repo_name.outputs.lowercase }}/base-image:latest
+          docker push ghcr.io/${{ steps.repo_name.outputs.lowercase }}/base-image:latest
