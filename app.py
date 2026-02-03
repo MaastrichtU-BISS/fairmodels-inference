@@ -25,7 +25,13 @@ logger = logging.getLogger(__name__)
 @app.route('/')
 def index():
     """Landing page with option to enter model ID."""
-    return render_template('index.html')
+    try:
+        metadata_handler = MetadataHandler()
+        models = metadata_handler.fetch_models_list()
+        return render_template('index.html', models=models)
+    except Exception as e:
+        logger.error(f"Error fetching models list: {str(e)}")
+        return render_template('index.html', models=[])
 
 
 @app.route('/model/<model_id>')

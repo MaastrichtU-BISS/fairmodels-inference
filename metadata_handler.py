@@ -15,12 +15,75 @@ class MetadataHandler:
     """Handles fetching and parsing model metadata from FAIRmodels.org."""
     
     BASE_URL = "https://v3.fairmodels.org/instance/"
+    LIST_URL = "https://v3.fairmodels.org/"
     
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
             'Accept': 'application/ld+json'
         })
+    
+    def fetch_models_list(self) -> List[Dict[str, Any]]:
+        """
+        Fetch the list of available models from FAIRmodels.org.
+        
+        Returns:
+            List of model dictionaries with id and metadata
+        """
+        try:
+            logger.info(f"Fetching models list from {self.LIST_URL}")
+            response = self.session.get(self.LIST_URL, timeout=10)
+            response.raise_for_status()
+            
+            models_data = response.json()
+            logger.info(f"Successfully fetched models list")
+            
+            # Parse the response - API returns dict where keys are UUIDs
+            models = []
+            if isinstance(models_data, dict):
+                for model_id, model_info in models_data.items():
+                    if isinstance(model_info, dict):
+                        # Extract title from top-level or properties
+                        title = model_info.get('title')
+                        if not title and 'properties' in model_info:
+                            props = model_info['properties']
+                            title = props.get('General Model Information.Title')
+                        
+                        if not title:
+                            title = model_id  # Fallback to ID
+                        
+                        models.append({
+                            'id': model_id,
+                            'title': title,
+                            'raw': model_info
+                        })
+            
+            logger.info(f"Parsed {len(models)} models from list")
+            return models
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching models list: {str(e)}")
+            return []
+    
+    def _extract_title_from_list_item(self, model: Dict[str, Any]) -> str:
+        """Extract title from a model list item."""
+        # Try various possible title fields
+        for field in ['title', 'name', 'label']:
+            if field in model:
+                title = model[field]
+                if isinstance(title, dict):
+                    return title.get('@value', str(title))
+                return str(title)
+        
+        # Try nested General Model Information
+        if 'General Model Information' in model:
+            info = model['General Model Information']
+            if isinstance(info, dict):
+                title = info.get('Title', {})
+                if isinstance(title, dict):
+                    return title.get('@value', '')
+        
+        return "Unknown Model"
     
     def fetch_metadata(self, model_id: str) -> Optional[Dict[str, Any]]:
         """
